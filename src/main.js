@@ -55,21 +55,25 @@ if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
     updateUI(false);
   };
 
-  recognition.onresult = (event) => {
-    let interimTranscript = "";
+ recognition.onresult = (event) => {
+    let finalTranscript = ''; // Only for confirmed words
+    let interimTranscript = ''; // Only for current guessing
+
     for (let i = event.resultIndex; i < event.results.length; ++i) {
-      if (event.results[i].isFinal) {
-        insertAtCursor(textArea, event.results[i][0].transcript + " ");
-      } else {
-        interimTranscript += event.results[i][0].transcript;
-      }
+        if (event.results[i].isFinal) {
+            // Only add to the box if it is a 100% finished sentence
+            insertAtCursor(textArea, event.results[i][0].transcript + ' ');
+        } else {
+            interimTranscript += event.results[i][0].transcript;
+        }
     }
+    
+    // Show the "guessing" text only in the status bar, NOT the text box
     if (interimTranscript) {
-      statusText.textContent =
-        "Heard: " + interimTranscript.substring(0, 30) + "...";
-      statusText.className = "text-green-600 font-medium h-6 text-sm italic";
+        statusText.textContent = "Heard: " + interimTranscript.substring(0, 30) + "...";
+        statusText.className = "text-green-600 font-medium h-6 text-sm italic";
     }
-  };
+};
 } else {
   micBtn.disabled = true;
   statusText.textContent = "Browser not supported. Try Chrome!";
@@ -202,9 +206,20 @@ function showToast(message) {
 }
 
 // --- Event Listeners ---
-micBtn.addEventListener("click", () => {
+micBtn.addEventListener("click", async () => {
   if (!recognition) return;
-  isRecording ? recognition.stop() : recognition.start();
+
+  if (!isRecording) {
+    try {
+      // This 'wakes up' the phone's permission gate early
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+      recognition.start();
+    } catch (err) {
+      showToast("Please allow microphone access in your settings.");
+    }
+  } else {
+    recognition.stop();
+  }
 });
 
 copyBtn.addEventListener("click", () => {
